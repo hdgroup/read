@@ -58,8 +58,11 @@ layout: default
       {% include comments.html %}
     </div>
   </div>
-  <div class="column one-fourth">
-    {% include sidebar-search.html %}
+  <div class="column one-fourth book-toc-sidebar">
+    <aside class="book-toc" aria-label="文章目录">
+      <div class="book-toc-title">目录</div>
+      <nav id="book-toc"></nav>
+    </aside>
     {% include sidebar-post-nav.html %}
   </div>
 </div>

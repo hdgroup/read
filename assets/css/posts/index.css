@@ -2,6 +2,80 @@
     z-index: 999;
 }
 
+.book-toc-sidebar {
+    position: relative;
+}
+
+.book-toc {
+    position: sticky;
+    top: 88px;
+    max-height: calc(100vh - 112px);
+    overflow: auto;
+    margin-bottom: 24px;
+    padding: 16px 14px;
+    border: 1px solid #d8dee4;
+    background: #fff;
+}
+
+.book-toc-title {
+    margin-bottom: 10px;
+    color: #24292f;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.book-toc-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.book-toc-item {
+    margin: 0;
+    padding: 0;
+}
+
+.book-toc-link {
+    display: block;
+    padding: 6px 8px;
+    border-left: 2px solid transparent;
+    color: #57606a;
+    font-size: 13px;
+    line-height: 1.45;
+    text-decoration: none;
+}
+
+.book-toc-link:hover,
+.book-toc-link:active,
+.book-toc-item.is-active > .book-toc-link {
+    border-left-color: #4183c4;
+    color: #0969da;
+    background: #f6f8fa;
+}
+
+.book-toc-children {
+    display: none;
+    margin: 0 0 4px 0;
+    padding: 0 0 0 12px;
+    list-style: none;
+}
+
+.book-toc-item.is-current-section > .book-toc-children,
+.book-toc-item.is-active > .book-toc-children {
+    display: block;
+}
+
+.book-toc-child .book-toc-link {
+    color: #6e7781;
+    font-size: 12px;
+}
+
+@media (max-width: 50em) {
+    .book-toc-sidebar {
+        display: none;
+    }
+}
+
 .post-directory {
     font-size: 14px;
     background: #fff;

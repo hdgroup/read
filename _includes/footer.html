@@ -37,6 +37,9 @@
     {% if site.components.share.enabled %}
     <script src="{{ assets_base_url }}/assets/vendor/share.js/dist/js/share.min.js"></script>
     {% endif %}
+    {% if page.layout == 'post' %}
+    <script src="{{ assets_base_url }}/assets/js/post-toc.js"></script>
+    {% endif %}
     <script src="{{ assets_base_url }}/assets/js/geopattern.js"></script>
     <script>
       jQuery(document).ready(function($) {

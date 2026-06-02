@@ -27,6 +27,30 @@
     color: #fff
 }
 
+.book-list .repo-list-item {
+    border-bottom: 1px solid #e6edf3;
+    margin: 0;
+    padding: 22px 0;
+}
+
+.book-list .repo-list-name {
+    margin-bottom: 8px;
+}
+
+.book-list .repo-list-name a {
+    color: #24292f;
+}
+
+.book-list .repo-list-description {
+    color: #57606a;
+    font-size: 15px;
+    line-height: 1.7;
+}
+
+.book-list .repo-list-meta {
+    margin-top: 10px;
+}
+
 
 @media (max-width:50em) {
   .home .collapsed .icon-bar {
