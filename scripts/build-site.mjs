@@ -5,6 +5,7 @@ import path from "node:path";
 const root = process.cwd();
 const sourceDir = path.join(root, "_posts/book");
 const siteDir = path.join(root, "site");
+const coverSourceDir = path.join(siteDir, "assets/covers");
 const distDir = path.join(root, "dist");
 const perPage = 18;
 
@@ -186,6 +187,117 @@ function excerpt(markdown, fallback) {
   return (cleaned[0] || fallback || "").slice(0, 150);
 }
 
+function makeTagline(post) {
+  const source = `${post.description} ${post.headings.slice(0, 8).map((heading) => heading.text).join(" ")}`;
+  const cleaned = stripTags(source)
+    .replace(/\s+/g, " ")
+    .replace(/[。！？!?].*$/, "")
+    .trim();
+  const core = cleaned || post.title;
+
+  if (/bitcoin|比特币|货币|经济|债务|金融|money/i.test(`${post.title} ${core}`)) {
+    return `从财富、信任与制度的角度，重新理解《${post.title}》提出的问题。`;
+  }
+  if (/history|历史|明朝|中国|帝国|战争|republic|国家/i.test(`${post.title} ${core}`)) {
+    return `沿着历史现场展开，看《${post.title}》如何解释权力、秩序与人的选择。`;
+  }
+  if (/psychology|心理|沟通|人生|老实人|随机|思考/i.test(`${post.title} ${core}`)) {
+    return `一本关于心智与行动的书，适合在《${post.title}》里寻找自我校准的线索。`;
+  }
+  if (/science|complexity|chaos|算法|人工智能|系统|技术/i.test(`${post.title} ${core}`)) {
+    return `把复杂世界拆成可观察的结构，《${post.title}》像一张通往新秩序的地图。`;
+  }
+
+  return `用一句话进入《${post.title}》：${core.slice(0, 58)}。`;
+}
+
+function makeArtPrompt(post) {
+  const themes = post.headings.slice(0, 6).map((heading) => heading.text).join("; ");
+  return [
+    "Use case: illustration-story",
+    "Asset type: square book-card illustration for a digital library",
+    `Primary request: Create a symbolic illustration for the book "${post.title}".`,
+    `Key information: ${post.description}; ${themes}`,
+    "Style/medium: refined editorial illustration, painterly digital art, rich texture, no text.",
+    "Composition/framing: centered square composition, strong silhouette readable at thumbnail size, generous margins.",
+    "Lighting/mood: thoughtful, literary, luminous, slightly cinematic.",
+    "Constraints: no words, no book title, no watermark, suitable as a website card image."
+  ].join("\n");
+}
+
+function hashValue(value) {
+  let hash = 2166136261;
+  for (const char of value) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function coverPalette(slug) {
+  const hash = hashValue(slug);
+  const hue = hash % 360;
+  return {
+    a: `hsl(${hue} 58% 34%)`,
+    b: `hsl(${(hue + 38) % 360} 48% 48%)`,
+    c: `hsl(${(hue + 190) % 360} 54% 64%)`
+  };
+}
+
+function generatedCoverSvg(post) {
+  const palette = coverPalette(post.slug);
+  const title = escapeHtml(post.title);
+  const category = escapeHtml(post.category);
+  const promptHint = escapeHtml(post.artPrompt.split("\n")[3]?.replace("Key information: ", "") || post.description);
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200" viewBox="0 0 900 1200" role="img" aria-labelledby="title desc">
+  <title id="title">${title}</title>
+  <desc id="desc">${promptHint}</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="${palette.a}"/>
+      <stop offset="0.62" stop-color="${palette.b}"/>
+      <stop offset="1" stop-color="${palette.c}"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="35%" cy="22%" r="62%">
+      <stop offset="0" stop-color="#fff8" />
+      <stop offset="1" stop-color="#fff0" />
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="22" stdDeviation="22" flood-color="#000" flood-opacity=".26"/>
+    </filter>
+  </defs>
+  <rect width="900" height="1200" rx="34" fill="url(#bg)"/>
+  <rect width="900" height="1200" rx="34" fill="url(#glow)"/>
+  <g opacity=".22" stroke="#fff" fill="none">
+    <path d="M90 280C210 120 370 160 450 300s230 170 340 30"/>
+    <path d="M52 760c160-120 310-112 448 24s260 132 348 2"/>
+    <path d="M140 1000c80-220 260-280 410-160s220 20 270-112"/>
+  </g>
+  <g filter="url(#shadow)">
+    <path d="M210 330h360c66 0 120 54 120 120v360c0 66-54 120-120 120H210V330z" fill="#fff" opacity=".9"/>
+    <path d="M210 330c82 34 128 82 138 146v454c-42-32-88-52-138-60V330z" fill="#101820" opacity=".16"/>
+    <path d="M340 486c98-94 228-86 286 18-112 16-196 70-250 162-28-58-40-118-36-180z" fill="${palette.a}" opacity=".72"/>
+    <circle cx="548" cy="558" r="72" fill="${palette.c}" opacity=".82"/>
+    <path d="M326 776c84-104 192-136 324-96-66 90-158 132-276 126z" fill="${palette.b}" opacity=".76"/>
+  </g>
+  <text x="78" y="96" fill="#fff" font-family="ui-sans-serif, system-ui, sans-serif" font-size="26" font-weight="800" opacity=".86">${post.year}</text>
+  <text x="78" y="135" fill="#fff" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" opacity=".72">${category}</text>
+  <text x="78" y="1090" fill="#fff" font-family="ui-sans-serif, system-ui, sans-serif" font-size="34" font-weight="800">${title.slice(0, 18)}</text>
+</svg>`;
+}
+
+async function resolveCover(post) {
+  for (const ext of ["png", "jpg", "jpeg", "webp", "svg"]) {
+    const file = path.join(coverSourceDir, `${post.slug}.${ext}`);
+    if (existsSync(file)) {
+      return { source: file, href: `/assets/covers/${post.slug}.${ext}`, generated: false };
+    }
+  }
+
+  return { source: null, href: `/assets/covers/${post.slug}.svg`, generated: true };
+}
+
 function buildToc(headings) {
   const h1Count = headings.filter((heading) => heading.level === 1).length;
   const chapterLevel = h1Count >= 2 ? 1 : 2;
@@ -236,11 +348,16 @@ function siteHeader(current = "home") {
 }
 
 function bookCard(post) {
-  return `<article class="book-card" data-title="${escapeHtml(post.title.toLowerCase())}" data-year="${post.year}" data-category="${escapeHtml(post.category.toLowerCase())}">
+  return `<article class="book-card" data-title="${escapeHtml(post.title.toLowerCase())}" data-year="${post.year}" data-category="${escapeHtml(post.category.toLowerCase())}" data-tagline="${escapeHtml(post.tagline)}">
     <a class="book-card-link" href="/books/${post.slug}/">
-      <span class="book-year">${post.year}</span>
-      <h2>${escapeHtml(post.title)}</h2>
-      <p>${escapeHtml(post.description)}</p>
+      <figure class="book-cover">
+        <img src="${post.cover}" alt="${escapeHtml(post.title)} 插图" loading="lazy">
+        <figcaption>${escapeHtml(post.tagline)}</figcaption>
+      </figure>
+      <div class="book-info">
+        <span class="book-year">${post.year}</span>
+        <h2>${escapeHtml(post.title)}</h2>
+      </div>
       <div class="book-meta">
         <span>${escapeHtml(post.category)}</span>
         <span>${post.wordCount.toLocaleString("zh-CN")} 字</span>
@@ -300,7 +417,7 @@ function indexPage(posts, page, totalPages) {
       <h2>书籍列表</h2>
       <span data-result-count>${visible.length} / ${posts.length}</span>
     </div>
-    <div class="book-grid" data-book-grid>
+    <div class="book-grid" data-book-grid data-total-count="${posts.length}">
       ${visible.map(bookCard).join("")}
     </div>
     ${pagination(page, totalPages)}
@@ -361,8 +478,7 @@ for (const file of files) {
   const title = data.title || slugFromFile(file);
   const date = smartDate(file);
   const wordCount = body.replace(/\s/g, "").length;
-
-  posts.push({
+  const post = {
     slug: slugFromFile(file),
     file,
     title,
@@ -373,12 +489,27 @@ for (const file of files) {
     wordCount,
     html: rendered.html,
     headings: rendered.headings
-  });
+  };
+  post.tagline = makeTagline(post);
+  post.artPrompt = makeArtPrompt(post);
+  post.coverInfo = await resolveCover(post);
+  post.cover = post.coverInfo.href;
+  posts.push(post);
 }
 
 await rm(distDir, { recursive: true, force: true });
 await mkdir(distDir, { recursive: true });
 await copyAssets();
+
+await mkdir(path.join(distDir, "assets/covers"), { recursive: true });
+for (const post of posts) {
+  const target = path.join(distDir, "assets/covers", path.basename(post.cover));
+  if (post.coverInfo.generated) {
+    await writeFile(target, generatedCoverSvg(post));
+  } else {
+    await copyFile(post.coverInfo.source, target);
+  }
+}
 
 const totalPages = Math.ceil(posts.length / perPage);
 for (let page = 1; page <= totalPages; page += 1) {
@@ -400,7 +531,17 @@ await writeFile(path.join(distDir, "search-index.json"), JSON.stringify(posts.ma
   year: post.year,
   category: post.category,
   description: post.description,
+  tagline: post.tagline,
+  artPrompt: post.artPrompt,
+  cover: post.cover,
   wordCount: post.wordCount
+})), null, 2));
+
+await writeFile(path.join(distDir, "cover-prompts.json"), JSON.stringify(posts.map((post) => ({
+  title: post.title,
+  slug: post.slug,
+  output: `site/assets/covers/${post.slug}.png`,
+  prompt: post.artPrompt
 })), null, 2));
 
 if (existsSync(path.join(root, "CNAME"))) {

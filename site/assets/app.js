@@ -22,6 +22,7 @@ function initLibraryFilters() {
   let globalIndex = null;
   const initialHtml = grid.innerHTML;
   const initialCards = $$(".book-card", grid);
+  const totalSize = Number(grid.dataset.totalCount || initialCards.length);
 
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, (char) => ({
@@ -34,11 +35,16 @@ function initLibraryFilters() {
   }
 
   function renderCard(post) {
-    return `<article class="book-card" data-title="${escapeHtml(post.title.toLowerCase())}" data-year="${post.year}" data-category="${escapeHtml(post.category.toLowerCase())}">
+    return `<article class="book-card" data-title="${escapeHtml(post.title.toLowerCase())}" data-year="${post.year}" data-category="${escapeHtml(post.category.toLowerCase())}" data-tagline="${escapeHtml(post.tagline)}">
       <a class="book-card-link" href="/books/${post.slug}/">
-        <span class="book-year">${post.year}</span>
-        <h2>${escapeHtml(post.title)}</h2>
-        <p>${escapeHtml(post.description)}</p>
+        <figure class="book-cover">
+          <img src="${escapeHtml(post.cover)}" alt="${escapeHtml(post.title)} 插图" loading="lazy">
+          <figcaption>${escapeHtml(post.tagline)}</figcaption>
+        </figure>
+        <div class="book-info">
+          <span class="book-year">${post.year}</span>
+          <h2>${escapeHtml(post.title)}</h2>
+        </div>
         <div class="book-meta">
           <span>${escapeHtml(post.category)}</span>
           <span>${Number(post.wordCount || 0).toLocaleString("zh-CN")} 字</span>
@@ -77,7 +83,7 @@ function initLibraryFilters() {
         grid.innerHTML = initialHtml;
         grid.dataset.mode = "page";
       }
-      filterCards($$(".book-card", grid), initialCards.length, query);
+      filterCards($$(".book-card", grid), totalSize, query);
       return;
     }
 
