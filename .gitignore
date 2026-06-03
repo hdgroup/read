@@ -1,3 +1,4 @@
 .DS_Store
 dist/
+_site/
 site/assets/covers/douban-cover-results.json
