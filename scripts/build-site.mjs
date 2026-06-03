@@ -6,6 +6,7 @@ const root = process.cwd();
 const sourceDir = path.join(root, "_posts/book");
 const siteDir = path.join(root, "site");
 const coverSourceDir = path.join(siteDir, "assets/covers");
+const aiCoverSourceDir = path.join(siteDir, "assets/ai-covers");
 const distDir = path.join(root, "dist");
 const perPage = 20;
 const basePath = (process.env.BASE_PATH || "").replace(/\/$/, "");
@@ -190,30 +191,6 @@ function excerpt(markdown, fallback) {
   return (cleaned[0] || fallback || "").slice(0, 150);
 }
 
-function makeTagline(post) {
-  const source = `${post.description} ${post.headings.slice(0, 8).map((heading) => heading.text).join(" ")}`;
-  const cleaned = stripTags(source)
-    .replace(/\s+/g, " ")
-    .replace(/[。！？!?].*$/, "")
-    .trim();
-  const core = cleaned || post.title;
-
-  if (/bitcoin|比特币|货币|经济|债务|金融|money/i.test(`${post.title} ${core}`)) {
-    return `从财富、信任与制度的角度，重新理解《${post.title}》提出的问题。`;
-  }
-  if (/history|历史|明朝|中国|帝国|战争|republic|国家/i.test(`${post.title} ${core}`)) {
-    return `沿着历史现场展开，看《${post.title}》如何解释权力、秩序与人的选择。`;
-  }
-  if (/psychology|心理|沟通|人生|老实人|随机|思考/i.test(`${post.title} ${core}`)) {
-    return `一本关于心智与行动的书，适合在《${post.title}》里寻找自我校准的线索。`;
-  }
-  if (/science|complexity|chaos|算法|人工智能|系统|技术/i.test(`${post.title} ${core}`)) {
-    return `把复杂世界拆成可观察的结构，《${post.title}》像一张通往新秩序的地图。`;
-  }
-
-  return `用一句话进入《${post.title}》：${core.slice(0, 58)}。`;
-}
-
 function makeArtPrompt(post) {
   const themes = post.headings.slice(0, 6).map((heading) => heading.text).join("; ");
   return [
@@ -226,6 +203,89 @@ function makeArtPrompt(post) {
     "Lighting/mood: thoughtful, literary, luminous, slightly cinematic.",
     "Constraints: no words, no book title, no watermark, suitable as a website card image."
   ].join("\n");
+}
+
+function plainMarkdown(markdown) {
+  return markdown
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/!\[[^\]]*]\([^)]+\)/g, "")
+    .replace(/\[([^\]]+)]\([^)]+\)/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^>\s?/gm, "")
+    .replace(/^[\s*-]*\d+[\).、]\s*/gm, "")
+    .replace(/[*_`#>-]/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{2,}/g, "\n");
+}
+
+function titleTokens(title) {
+  const tokens = String(title)
+    .replace(/[《》“”"'!?？！，,.:：;；()[\]（）\s-]+/g, " ")
+    .split(/\s+/)
+    .filter((token) => token.length >= 2);
+  if (!tokens.length && title.length >= 2) tokens.push(title.slice(0, 2));
+  return tokens.slice(0, 4);
+}
+
+function sentenceCandidates(markdown) {
+  const text = plainMarkdown(markdown);
+  const pieces = text
+    .split(/(?<=[。！？!?])|\n+/)
+    .map((item) => item.trim())
+    .map((item) => item.replace(/^["'“”‘’]+|["'“”‘’]+$/g, ""))
+    .filter(Boolean);
+
+  return pieces
+    .map((sentence, index) => ({
+      sentence: sentence.replace(/\s+/g, " "),
+      index
+    }))
+    .filter(({ sentence }) => {
+      const length = sentence.length;
+      if (length < 16 || length > 120) return false;
+      if (/[：:]$/.test(sentence)) return false;
+      if (/豆瓣|版权|版权所有|侵权|原名|作者：|制作：|关键词|目录|献词|引用|参考文献|出版|ISBN|Originally|copyright/i.test(sentence)) return false;
+      if (/成书|传刻|考订|校注|译本|译者|学界|此处取益|中文简体|授权/.test(sentence)) return false;
+      if (/用一句话|一句话进入|进入这本书|打开方式|读者朋友|如前所述/.test(sentence)) return false;
+      if (/^第[一二三四五六七八九十\d]+[章节篇卷部]/.test(sentence)) return false;
+      if (/^[\d\s.,，。、:：-]+$/.test(sentence)) return false;
+      return true;
+    });
+}
+
+function makeTagline(post, markdown) {
+  const signals = [
+    "问题", "权力", "秩序", "制度", "历史", "生命", "系统", "混沌", "复杂", "货币",
+    "自由", "国家", "人性", "心理", "沟通", "算法", "技术", "文明", "财富", "政治",
+    "关系", "暴力", "专制", "民主", "科学", "时间", "选择", "战争", "伦理", "真相"
+  ];
+  const tokens = titleTokens(post.title);
+  const candidates = sentenceCandidates(markdown);
+  const scored = candidates.map((item) => {
+    let score = 0;
+    const length = item.sentence.length;
+    score += Math.max(0, 42 - Math.abs(length - 56));
+    score += Math.max(0, 18 - item.index / 12);
+    for (const token of tokens) {
+      if (item.sentence.includes(token)) score += 28;
+    }
+    for (const signal of signals) {
+      if (item.sentence.includes(signal)) score += 8;
+    }
+    if (/[：:；;]/.test(item.sentence)) score += 3;
+    if (/本书|这本书|作者|读者|我想|我要|我们希望/.test(item.sentence)) score -= 18;
+    return { ...item, score };
+  }).sort((a, b) => b.score - a.score);
+
+  const best = scored[0]?.sentence || post.description || post.title;
+  const cleaned = best
+    .replace(/^本书(认为|指出|提出|讲述|讨论|解释|试图)?[：:，,]?\s*/, "")
+    .replace(/^这本书(认为|指出|提出|讲述|讨论|解释|试图)?[：:，,]?\s*/, "")
+    .replace(/[：:；;，,、]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return cleaned.length > 76 ? `${cleaned.slice(0, 74)}…` : cleaned;
 }
 
 function hashValue(value) {
@@ -247,11 +307,32 @@ function coverPalette(slug) {
   };
 }
 
-function generatedCoverSvg(post) {
+function generatedArtSvg(post) {
   const palette = coverPalette(post.slug);
+  const hash = hashValue(`${post.slug}:${post.title}`);
+  const motif = hash % 5;
   const title = escapeHtml(post.title);
-  const category = escapeHtml(post.category);
   const promptHint = escapeHtml(post.artPrompt.split("\n")[3]?.replace("Key information: ", "") || post.description);
+  const ring = (hash % 220) + 140;
+  const sweep = ((hash >>> 8) % 220) + 140;
+  const tilt = ((hash >>> 16) % 36) - 18;
+  const motifs = [
+    `<path d="M210 780c80-230 214-360 402-390 60 122 42 260-54 414-126 50-254 44-348-24z" fill="${palette.b}" opacity=".76"/>
+    <circle cx="560" cy="430" r="${ring}" fill="none" stroke="#fff" stroke-width="18" opacity=".2"/>
+    <path d="M250 342c126 108 272 140 438 96" stroke="#fff" stroke-width="28" stroke-linecap="round" opacity=".16"/>`,
+    `<path d="M190 800c118-180 246-286 384-318 70 96 102 204 96 324-178 70-332 68-480-6z" fill="${palette.a}" opacity=".72"/>
+    <path d="M300 272c-18 210 44 382 186 516" stroke="#fff" stroke-width="22" stroke-linecap="round" opacity=".18"/>
+    <circle cx="620" cy="548" r="${sweep}" fill="${palette.c}" opacity=".24"/>`,
+    `<path d="M180 648c102-176 238-254 408-234 98 124 128 252 90 384-184 50-346 20-498-150z" fill="${palette.c}" opacity=".58"/>
+    <path d="M212 388c190-82 350-72 480 30M224 820c182-132 364-150 546-54" stroke="#fff" stroke-width="18" stroke-linecap="round" opacity=".18"/>
+    <circle cx="454" cy="610" r="${ring}" fill="none" stroke="${palette.b}" stroke-width="34" opacity=".38"/>`,
+    `<path d="M220 826c24-212 112-360 264-444 154 50 248 154 282 312-116 132-284 188-546 132z" fill="${palette.b}" opacity=".7"/>
+    <path d="M452 284c98 150 122 316 72 498" stroke="#fff" stroke-width="24" stroke-linecap="round" opacity=".18"/>
+    <path d="M284 454c170-58 320-30 450 84" stroke="${palette.c}" stroke-width="42" stroke-linecap="round" opacity=".3"/>`,
+    `<path d="M178 760c92-206 244-326 456-360 94 128 108 270 42 426-210 42-370 34-498-66z" fill="${palette.a}" opacity=".72"/>
+    <circle cx="430" cy="508" r="${ring}" fill="${palette.c}" opacity=".28"/>
+    <path d="M232 310c116 160 286 246 510 258" stroke="#fff" stroke-width="20" stroke-linecap="round" opacity=".16"/>`
+  ];
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200" viewBox="0 0 900 1200" role="img" aria-labelledby="title desc">
   <title id="title">${title}</title>
@@ -269,24 +350,29 @@ function generatedCoverSvg(post) {
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="22" stdDeviation="22" flood-color="#000" flood-opacity=".26"/>
     </filter>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency=".82" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncA type="table" tableValues="0 .18"/>
+      </feComponentTransfer>
+    </filter>
   </defs>
   <rect width="900" height="1200" rx="34" fill="url(#bg)"/>
   <rect width="900" height="1200" rx="34" fill="url(#glow)"/>
-  <g opacity=".22" stroke="#fff" fill="none">
-    <path d="M90 280C210 120 370 160 450 300s230 170 340 30"/>
-    <path d="M52 760c160-120 310-112 448 24s260 132 348 2"/>
-    <path d="M140 1000c80-220 260-280 410-160s220 20 270-112"/>
+  <rect width="900" height="1200" rx="34" filter="url(#grain)" opacity=".55"/>
+  <g opacity=".22" stroke="#fff" fill="none" transform="rotate(${tilt} 450 600)">
+    <path d="M70 260C210 118 370 160 450 300s230 170 360 20"/>
+    <path d="M44 762c164-124 316-114 456 22s266 136 360-8"/>
+    <path d="M128 1010c86-224 270-286 424-156s230 16 290-124"/>
   </g>
   <g filter="url(#shadow)">
-    <path d="M210 330h360c66 0 120 54 120 120v360c0 66-54 120-120 120H210V330z" fill="#fff" opacity=".9"/>
-    <path d="M210 330c82 34 128 82 138 146v454c-42-32-88-52-138-60V330z" fill="#101820" opacity=".16"/>
-    <path d="M340 486c98-94 228-86 286 18-112 16-196 70-250 162-28-58-40-118-36-180z" fill="${palette.a}" opacity=".72"/>
-    <circle cx="548" cy="558" r="72" fill="${palette.c}" opacity=".82"/>
-    <path d="M326 776c84-104 192-136 324-96-66 90-158 132-276 126z" fill="${palette.b}" opacity=".76"/>
+    <rect x="116" y="184" width="668" height="832" rx="46" fill="#fff" opacity=".1"/>
+    <g transform="translate(0 34)">
+      ${motifs[motif]}
+    </g>
+    <path d="M176 922c134 54 292 62 474 24 54-12 94 4 120 48-234 86-442 78-624-24 8-22 16-38 30-48z" fill="#fff" opacity=".2"/>
   </g>
-  <text x="78" y="96" fill="#fff" font-family="ui-sans-serif, system-ui, sans-serif" font-size="26" font-weight="800" opacity=".86">${post.year}</text>
-  <text x="78" y="135" fill="#fff" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" opacity=".72">${category}</text>
-  <text x="78" y="1090" fill="#fff" font-family="ui-sans-serif, system-ui, sans-serif" font-size="34" font-weight="800">${title.slice(0, 18)}</text>
 </svg>`;
 }
 
@@ -294,11 +380,57 @@ async function resolveCover(post) {
   for (const ext of ["png", "jpg", "jpeg", "webp", "svg"]) {
     const file = path.join(coverSourceDir, `${post.slug}.${ext}`);
     if (existsSync(file)) {
-      return { source: file, href: `/assets/covers/${post.slug}.${ext}`, generated: false };
+      return {
+        source: file,
+        href: `/assets/covers/${post.slug}.${ext}`,
+        ext,
+        isAi: await isExistingAiCover(file)
+      };
     }
   }
 
-  return { source: null, href: `/assets/covers/${post.slug}.svg`, generated: true };
+  return null;
+}
+
+async function resolveAiCover(post) {
+  for (const ext of ["png", "jpg", "jpeg", "webp", "svg"]) {
+    const file = path.join(aiCoverSourceDir, `${post.slug}.${ext}`);
+    if (existsSync(file)) {
+      return { source: file, href: `/assets/ai-covers/${post.slug}.${ext}`, generated: false };
+    }
+  }
+
+  if (post.coverInfo?.isAi) {
+    return {
+      source: post.coverInfo.source,
+      href: `/assets/ai-covers/${post.slug}${path.extname(post.coverInfo.source)}`,
+      generated: false
+    };
+  }
+
+  return {
+    source: null,
+    href: `/assets/ai-covers/${post.slug}.svg`,
+    generated: true
+  };
+}
+
+async function imageDimensions(file) {
+  const bytes = await readFile(file);
+  if (bytes.length >= 24 && bytes.toString("ascii", 1, 4) === "PNG") {
+    return {
+      width: bytes.readUInt32BE(16),
+      height: bytes.readUInt32BE(20)
+    };
+  }
+
+  return null;
+}
+
+async function isExistingAiCover(file) {
+  if (path.extname(file).toLowerCase() !== ".png") return false;
+  const dimensions = await imageDimensions(file);
+  return dimensions?.width === 1254 && dimensions?.height === 1254;
 }
 
 function buildToc(headings) {
@@ -354,14 +486,11 @@ function siteHeader(current = "home") {
 function bookCard(post) {
   return `<article class="book-card" data-title="${escapeHtml(post.title.toLowerCase())}" data-year="${post.year}" data-category="${escapeHtml(post.category.toLowerCase())}" data-tagline="${escapeHtml(post.tagline)}">
     <a class="book-card-link" href="${withBase(`/books/${post.slug}/`)}">
-      <figure class="book-cover">
-        <img src="${withBase(post.cover)}" alt="${escapeHtml(post.title)} 插图" loading="lazy">
+      <figure class="book-cover${post.originalCover ? " has-original-cover" : ""}">
+        <img class="book-image book-ai-image" src="${withBase(post.aiCover)}" alt="${escapeHtml(post.title)} AI 插图" loading="lazy">
+        ${post.originalCover ? `<img class="book-image book-original-image" src="${withBase(post.originalCover)}" alt="${escapeHtml(post.title)} 原封面" loading="lazy">` : ""}
         <figcaption>${escapeHtml(post.tagline)}</figcaption>
       </figure>
-      <div class="book-meta">
-        <span>${escapeHtml(post.category)}</span>
-        <span>${post.wordCount.toLocaleString("zh-CN")} 字</span>
-      </div>
     </a>
   </article>`;
 }
@@ -481,10 +610,12 @@ for (const file of files) {
     html: rendered.html,
     headings: rendered.headings
   };
-  post.tagline = makeTagline(post);
+  post.tagline = makeTagline(post, body);
   post.artPrompt = makeArtPrompt(post);
   post.coverInfo = await resolveCover(post);
-  post.cover = post.coverInfo.href;
+  post.aiCoverInfo = await resolveAiCover(post);
+  post.aiCover = post.aiCoverInfo.href;
+  post.originalCover = post.coverInfo && !post.coverInfo.isAi ? post.coverInfo.href : "";
   posts.push(post);
 }
 
@@ -492,13 +623,17 @@ await rm(distDir, { recursive: true, force: true });
 await mkdir(distDir, { recursive: true });
 await copyAssets();
 
+await mkdir(path.join(distDir, "assets/ai-covers"), { recursive: true });
 await mkdir(path.join(distDir, "assets/covers"), { recursive: true });
 for (const post of posts) {
-  const target = path.join(distDir, "assets/covers", path.basename(post.cover));
-  if (post.coverInfo.generated) {
-    await writeFile(target, generatedCoverSvg(post));
+  if (post.aiCoverInfo.generated) {
+    await writeFile(path.join(distDir, "assets/ai-covers", `${post.slug}.svg`), generatedArtSvg(post));
   } else {
-    await copyFile(post.coverInfo.source, target);
+    await copyFile(post.aiCoverInfo.source, path.join(distDir, "assets/ai-covers", path.basename(post.aiCover)));
+  }
+
+  if (post.originalCover && post.coverInfo) {
+    await copyFile(post.coverInfo.source, path.join(distDir, "assets/covers", path.basename(post.originalCover)));
   }
 }
 
@@ -524,14 +659,15 @@ await writeFile(path.join(distDir, "search-index.json"), JSON.stringify(posts.ma
   description: post.description,
   tagline: post.tagline,
   artPrompt: post.artPrompt,
-  cover: post.cover,
+  aiCover: post.aiCover,
+  originalCover: post.originalCover,
   wordCount: post.wordCount
 })), null, 2));
 
 await writeFile(path.join(distDir, "cover-prompts.json"), JSON.stringify(posts.map((post) => ({
   title: post.title,
   slug: post.slug,
-  output: `site/assets/covers/${post.slug}.png`,
+  output: `site/assets/ai-covers/${post.slug}.png`,
   prompt: post.artPrompt
 })), null, 2));
 
