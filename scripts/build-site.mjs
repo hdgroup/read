@@ -7,7 +7,7 @@ const sourceDir = path.join(root, "_posts/book");
 const siteDir = path.join(root, "site");
 const coverSourceDir = path.join(siteDir, "assets/covers");
 const distDir = path.join(root, "dist");
-const perPage = 18;
+const perPage = 20;
 const basePath = (process.env.BASE_PATH || "").replace(/\/$/, "");
 
 const escapeHtml = (value = "") =>
@@ -320,13 +320,14 @@ function buildToc(headings) {
 }
 
 function layout({ title, body, pageClass = "", description = "" }) {
+  const pageTitle = title === "Delia‘s 藏书阁" ? title : `${title} · Delia‘s 藏书阁`;
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="${escapeHtml(description)}">
-  <title>${escapeHtml(title)} · Delia's 藏书阁</title>
+  <title>${escapeHtml(pageTitle)}</title>
   <link rel="stylesheet" href="${withBase("/assets/app.css")}">
   <script>document.documentElement.dataset.theme=localStorage.getItem("theme")||"light"</script>
 </head>
@@ -340,7 +341,7 @@ function layout({ title, body, pageClass = "", description = "" }) {
 function siteHeader(current = "home") {
   return `<header class="site-shell">
   <nav class="topbar">
-    <a class="brand" href="${withBase("/")}" aria-label="Delia's 藏书阁">Delia's <span>藏书阁</span></a>
+    <a class="brand" href="${withBase("/")}" aria-label="Delia‘s 藏书阁">Delia‘s <span>藏书阁</span></a>
     <div class="nav-actions">
       <a class="${current === "home" ? "active" : ""}" href="${withBase("/")}">书库</a>
       <a href="https://github.com/hdgroup/read" target="_blank" rel="noreferrer">GitHub</a>
@@ -357,16 +358,24 @@ function bookCard(post) {
         <img src="${withBase(post.cover)}" alt="${escapeHtml(post.title)} 插图" loading="lazy">
         <figcaption>${escapeHtml(post.tagline)}</figcaption>
       </figure>
-      <div class="book-info">
-        <span class="book-year">${post.year}</span>
-        <h2>${escapeHtml(post.title)}</h2>
-      </div>
       <div class="book-meta">
         <span>${escapeHtml(post.category)}</span>
         <span>${post.wordCount.toLocaleString("zh-CN")} 字</span>
       </div>
     </a>
   </article>`;
+}
+
+function shelfRows(posts) {
+  const rows = [];
+  for (let index = 0; index < posts.length; index += 4) {
+    const row = posts.slice(index, index + 4);
+    rows.push(`<div class="shelf-row" data-shelf-row="${Math.floor(index / 4) + 1}">
+        ${row.map(bookCard).join("")}
+      </div>
+      <div class="shelf-divider" aria-hidden="true"></div>`);
+  }
+  return rows.join("");
 }
 
 function pagination(page, totalPages) {
@@ -386,42 +395,16 @@ function pagination(page, totalPages) {
 function indexPage(posts, page, totalPages) {
   const start = (page - 1) * perPage;
   const visible = posts.slice(start, start + perPage);
-  const years = [...new Set(posts.map((post) => post.year))].sort((a, b) => b.localeCompare(a));
 
   return layout({
-    title: page === 1 ? "书库" : `书库 第 ${page} 页`,
+    title: page === 1 ? "Delia‘s 藏书阁" : `Delia‘s 藏书阁 第 ${page} 页`,
     pageClass: "home-page",
-    description: "Delia's 藏书阁，自动从 Markdown 生成的静态书库。",
+    description: "Delia‘s 藏书阁，自动从 Markdown 生成的静态书库。",
     body: `${siteHeader("home")}
-<section class="hero">
-  <div class="hero-copy">
-    <p class="eyebrow">Markdown powered library</p>
-    <h1>专心维护文字，剩下的交给网页。</h1>
-    <p>共收录 ${posts.length} 本书。列表、分页、目录、阅读进度和主题切换都由静态构建自动生成。</p>
-  </div>
-  <div class="hero-orbit" aria-hidden="true">
-    <span></span><span></span><span></span>
-  </div>
-</section>
 <main class="library">
-  <aside class="library-panel">
-    <label class="search-box">
-      <span>搜索</span>
-      <input data-search type="search" placeholder="书名、分类或年份">
-    </label>
-    <div class="filter-group" aria-label="年份筛选">
-      <button class="active" data-filter-year="all" type="button">全部</button>
-      ${years.slice(0, 6).map((year) => `<button data-filter-year="${year}" type="button">${year}</button>`).join("")}
-    </div>
-    <p class="panel-note">当前页展示 ${visible.length} 本，完整书库可通过分页浏览。</p>
-  </aside>
-  <section>
-    <div class="section-head">
-      <h2>书籍列表</h2>
-      <span data-result-count>${visible.length} / ${posts.length}</span>
-    </div>
+  <section class="shelf-stage" aria-label="Delia‘s 藏书阁">
     <div class="book-grid" data-book-grid data-total-count="${posts.length}">
-      ${visible.map(bookCard).join("")}
+      ${shelfRows(visible)}
     </div>
     ${pagination(page, totalPages)}
   </section>
@@ -469,6 +452,11 @@ async function copyAssets() {
   await mkdir(path.join(distDir, "assets"), { recursive: true });
   await copyFile(path.join(siteDir, "assets/app.css"), path.join(distDir, "assets/app.css"));
   await copyFile(path.join(siteDir, "assets/app.js"), path.join(distDir, "assets/app.js"));
+  await copyFile(path.join(siteDir, "assets/bookshelf-wood.png"), path.join(distDir, "assets/bookshelf-wood.png"));
+  const cnamePath = path.join(siteDir, "CNAME");
+  if (existsSync(cnamePath)) {
+    await copyFile(cnamePath, path.join(distDir, "CNAME"));
+  }
 }
 
 const files = (await walk(sourceDir)).sort().reverse();

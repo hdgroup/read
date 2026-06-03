@@ -23,8 +23,6 @@ jobs:
         with:
           node-version: 24
       - run: npm run build
-        env:
-          BASE_PATH: /read
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

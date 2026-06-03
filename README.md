@@ -2,7 +2,7 @@
 
 一个由 Markdown 书稿自动生成的静态阅读站点。
 
-在线访问：[https://hdgroup.github.io/read/](https://hdgroup.github.io/read/)
+在线访问：[https://read.delia.love/](https://read.delia.love/)
 
 源码仓库：[https://github.com/hdgroup/read](https://github.com/hdgroup/read)
 
@@ -12,10 +12,10 @@
 
 - 保留 `_posts/book/**` 下的 131 篇 Markdown 书稿，移除了旧站点里的非书籍文章、Jekyll 模板、Ruby 依赖、旧 assets 和 `_site` 生成物。
 - 新增 `scripts/build-site.mjs`，用 Node.js 直接把 Markdown 书稿生成静态 HTML，不再依赖 Jekyll、Ruby、接口服务或数据库。
-- 新增书籍列表页，以“一本书一本书”的卡片形式展示全部书稿，支持搜索、分类筛选、分页、封面和悬停简介。
+- 新增书籍列表页，以“五层书架”的形式展示书稿；每页 20 本书，每层 4 本，支持分页、封面和悬停简介。
 - 新增阅读页，右侧展示目录；默认显示章节目录，滚动到某一章时自动展开该章的二级目录，并同步阅读进度。
 - 为每本书补齐封面素材：优先使用豆瓣封面，找不到时使用 AI 生成插图。封面统一放在 `site/assets/covers/`。
-- 新增 GitHub Pages 部署 workflow，推送到 `main` 后自动构建并发布到 `/read/`。
+- 新增 GitHub Pages 部署 workflow，推送到 `main` 后自动构建并发布到自定义域名 `read.delia.love`。
 
 ## 目录结构
 
@@ -23,8 +23,9 @@
 .
 ├── _posts/book/              # Markdown 书稿，只维护这里的内容即可
 ├── site/assets/app.css       # 站点样式
-├── site/assets/app.js        # 搜索、筛选、目录联动等前端交互
+├── site/assets/app.js        # 主题切换、目录联动等前端交互
 ├── site/assets/covers/       # 书籍封面，文件名使用书稿 slug
+├── site/CNAME                # GitHub Pages 自定义域名
 ├── scripts/build-site.mjs    # 静态站点生成器
 ├── scripts/fetch-douban-covers.mjs
 ├── .github/workflows/deploy.yml
@@ -71,7 +72,7 @@ npm run build
 npx serve dist
 ```
 
-如果要模拟 GitHub Pages 的 `/read/` 子路径：
+如果要模拟旧的 GitHub Pages `/read/` 子路径：
 
 ```bash
 BASE_PATH=/read npm run build
@@ -81,12 +82,13 @@ BASE_PATH=/read npm run build
 
 GitHub Pages 入口：
 
-[https://hdgroup.github.io/read/](https://hdgroup.github.io/read/)
+[https://read.delia.love/](https://read.delia.love/)
 
 部署方式：
 
 - 推送到 `main` 分支后，`.github/workflows/deploy.yml` 会自动运行。
 - workflow 使用 Node.js 构建 `dist/`，并通过 GitHub Pages 发布。
+- `site/CNAME` 会在构建时复制到 `dist/CNAME`，用于保持 GitHub Pages 的自定义域名配置。
 - 仓库已经改成 public，GitHub Pages 可以对外访问。
 
 如果页面暂时打不开，通常是 GitHub Pages 设置或 Actions 还没跑完：

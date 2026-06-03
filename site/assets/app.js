@@ -14,102 +14,6 @@ function initTheme() {
   });
 }
 
-function initLibraryFilters() {
-  const input = $("[data-search]");
-  const grid = $("[data-book-grid]");
-  const count = $("[data-result-count]");
-  if (!input || !grid || !count) return;
-
-  let year = "all";
-  let globalIndex = null;
-  const initialHtml = grid.innerHTML;
-  const initialCards = $$(".book-card", grid);
-  const totalSize = Number(grid.dataset.totalCount || initialCards.length);
-
-  function escapeHtml(value) {
-    return String(value ?? "").replace(/[&<>"']/g, (char) => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;"
-    })[char]);
-  }
-
-  function renderCard(post) {
-    return `<article class="book-card" data-title="${escapeHtml(post.title.toLowerCase())}" data-year="${post.year}" data-category="${escapeHtml(post.category.toLowerCase())}" data-tagline="${escapeHtml(post.tagline)}">
-      <a class="book-card-link" href="${withBase(`/books/${post.slug}/`)}">
-        <figure class="book-cover">
-          <img src="${escapeHtml(withBase(post.cover))}" alt="${escapeHtml(post.title)} 插图" loading="lazy">
-          <figcaption>${escapeHtml(post.tagline)}</figcaption>
-        </figure>
-        <div class="book-info">
-          <span class="book-year">${post.year}</span>
-          <h2>${escapeHtml(post.title)}</h2>
-        </div>
-        <div class="book-meta">
-          <span>${escapeHtml(post.category)}</span>
-          <span>${Number(post.wordCount || 0).toLocaleString("zh-CN")} 字</span>
-        </div>
-      </a>
-    </article>`;
-  }
-
-  async function getIndex() {
-    if (!globalIndex) {
-      const response = await fetch(withBase("/search-index.json"));
-      globalIndex = await response.json();
-    }
-    return globalIndex;
-  }
-
-  function filterCards(cards, sourceSize, query) {
-    let visible = 0;
-
-    cards.forEach((card) => {
-      const matchesQuery = !query || `${card.dataset.title} ${card.dataset.year} ${card.dataset.category}`.includes(query);
-      const matchesYear = year === "all" || card.dataset.year === year;
-      const show = matchesQuery && matchesYear;
-      card.hidden = !show;
-      if (show) visible += 1;
-    });
-
-    count.textContent = `${visible} / ${sourceSize}`;
-  }
-
-  async function apply() {
-    const query = input.value.trim().toLowerCase();
-
-    if (!query) {
-      if (grid.dataset.mode === "search") {
-        grid.innerHTML = initialHtml;
-        grid.dataset.mode = "page";
-      }
-      filterCards($$(".book-card", grid), totalSize, query);
-      return;
-    }
-
-    const index = await getIndex();
-    const matched = index.filter((post) => {
-      const haystack = `${post.title} ${post.category} ${post.year} ${post.description}`.toLowerCase();
-      return haystack.includes(query) && (year === "all" || post.year === year);
-    });
-
-    grid.dataset.mode = "search";
-    grid.innerHTML = matched.map(renderCard).join("");
-    count.textContent = `${matched.length} / ${index.length}`;
-  }
-
-  input.addEventListener("input", apply);
-  $$("[data-filter-year]").forEach((button) => {
-    button.addEventListener("click", () => {
-      year = button.dataset.filterYear;
-      $$("[data-filter-year]").forEach((item) => item.classList.toggle("active", item === button));
-      apply();
-    });
-  });
-}
-
 function initReader() {
   const article = $(".article-content");
   const progress = $("[data-reading-progress]");
@@ -151,5 +55,4 @@ function initReader() {
 }
 
 initTheme();
-initLibraryFilters();
 initReader();
