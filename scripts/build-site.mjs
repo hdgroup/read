@@ -8,6 +8,7 @@ const siteDir = path.join(root, "site");
 const coverSourceDir = path.join(siteDir, "assets/covers");
 const distDir = path.join(root, "dist");
 const perPage = 18;
+const basePath = (process.env.BASE_PATH || "").replace(/\/$/, "");
 
 const escapeHtml = (value = "") =>
   String(value).replace(/[&<>"']/g, (char) => ({
@@ -19,6 +20,8 @@ const escapeHtml = (value = "") =>
   })[char]);
 
 const stripTags = (value = "") => value.replace(/<[^>]+>/g, "");
+
+const withBase = (url) => `${basePath}${url}`;
 
 const slugify = (value, fallback = "section") => {
   const slug = String(value)
@@ -324,12 +327,12 @@ function layout({ title, body, pageClass = "", description = "" }) {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="${escapeHtml(description)}">
   <title>${escapeHtml(title)} · Delia's 藏书阁</title>
-  <link rel="stylesheet" href="/assets/app.css">
+  <link rel="stylesheet" href="${withBase("/assets/app.css")}">
   <script>document.documentElement.dataset.theme=localStorage.getItem("theme")||"light"</script>
 </head>
-<body class="${pageClass}">
+<body class="${pageClass}" data-base-path="${escapeHtml(basePath)}">
   ${body}
-  <script src="/assets/app.js"></script>
+  <script src="${withBase("/assets/app.js")}"></script>
 </body>
 </html>`;
 }
@@ -337,10 +340,10 @@ function layout({ title, body, pageClass = "", description = "" }) {
 function siteHeader(current = "home") {
   return `<header class="site-shell">
   <nav class="topbar">
-    <a class="brand" href="/" aria-label="Delia's 藏书阁">Delia's <span>藏书阁</span></a>
+    <a class="brand" href="${withBase("/")}" aria-label="Delia's 藏书阁">Delia's <span>藏书阁</span></a>
     <div class="nav-actions">
-      <a class="${current === "home" ? "active" : ""}" href="/">书库</a>
-      <a href="https://github.com/hdgroup/lib" target="_blank" rel="noreferrer">GitHub</a>
+      <a class="${current === "home" ? "active" : ""}" href="${withBase("/")}">书库</a>
+      <a href="https://github.com/hdgroup/read" target="_blank" rel="noreferrer">GitHub</a>
       <button class="icon-button" data-theme-toggle type="button" aria-label="切换主题">◐</button>
     </div>
   </nav>
@@ -349,9 +352,9 @@ function siteHeader(current = "home") {
 
 function bookCard(post) {
   return `<article class="book-card" data-title="${escapeHtml(post.title.toLowerCase())}" data-year="${post.year}" data-category="${escapeHtml(post.category.toLowerCase())}" data-tagline="${escapeHtml(post.tagline)}">
-    <a class="book-card-link" href="/books/${post.slug}/">
+    <a class="book-card-link" href="${withBase(`/books/${post.slug}/`)}">
       <figure class="book-cover">
-        <img src="${post.cover}" alt="${escapeHtml(post.title)} 插图" loading="lazy">
+        <img src="${withBase(post.cover)}" alt="${escapeHtml(post.title)} 插图" loading="lazy">
         <figcaption>${escapeHtml(post.tagline)}</figcaption>
       </figure>
       <div class="book-info">
@@ -368,7 +371,7 @@ function bookCard(post) {
 
 function pagination(page, totalPages) {
   if (totalPages <= 1) return "";
-  const href = (index) => index === 1 ? "/" : `/page/${index}/`;
+  const href = (index) => withBase(index === 1 ? "/" : `/page/${index}/`);
   const pages = Array.from({ length: totalPages }, (_, index) => index + 1)
     .map((index) => `<a class="${index === page ? "active" : ""}" href="${href(index)}">${index}</a>`)
     .join("");
@@ -440,7 +443,7 @@ function articlePage(post) {
     body: `<div class="reading-progress" data-reading-progress></div>
 ${siteHeader()}
 <header class="reader-hero">
-  <a class="back-link" href="/">← 返回书库</a>
+  <a class="back-link" href="${withBase("/")}">← 返回书库</a>
   <p class="eyebrow">${post.year} · ${escapeHtml(post.category)}</p>
   <h1>${escapeHtml(post.title)}</h1>
   <div class="reader-stats">
@@ -544,7 +547,7 @@ await writeFile(path.join(distDir, "cover-prompts.json"), JSON.stringify(posts.m
   prompt: post.artPrompt
 })), null, 2));
 
-if (existsSync(path.join(root, "CNAME"))) {
+if (process.env.CUSTOM_DOMAIN && existsSync(path.join(root, "CNAME"))) {
   await copyFile(path.join(root, "CNAME"), path.join(distDir, "CNAME"));
 }
 

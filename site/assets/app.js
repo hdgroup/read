@@ -1,5 +1,7 @@
 const $ = (selector, scope = document) => scope.querySelector(selector);
 const $$ = (selector, scope = document) => Array.from(scope.querySelectorAll(selector));
+const basePath = document.body?.dataset.basePath || "";
+const withBase = (url) => `${basePath}${url}`;
 
 function initTheme() {
   const button = $("[data-theme-toggle]");
@@ -36,9 +38,9 @@ function initLibraryFilters() {
 
   function renderCard(post) {
     return `<article class="book-card" data-title="${escapeHtml(post.title.toLowerCase())}" data-year="${post.year}" data-category="${escapeHtml(post.category.toLowerCase())}" data-tagline="${escapeHtml(post.tagline)}">
-      <a class="book-card-link" href="/books/${post.slug}/">
+      <a class="book-card-link" href="${withBase(`/books/${post.slug}/`)}">
         <figure class="book-cover">
-          <img src="${escapeHtml(post.cover)}" alt="${escapeHtml(post.title)} 插图" loading="lazy">
+          <img src="${escapeHtml(withBase(post.cover))}" alt="${escapeHtml(post.title)} 插图" loading="lazy">
           <figcaption>${escapeHtml(post.tagline)}</figcaption>
         </figure>
         <div class="book-info">
@@ -55,7 +57,7 @@ function initLibraryFilters() {
 
   async function getIndex() {
     if (!globalIndex) {
-      const response = await fetch("/search-index.json");
+      const response = await fetch(withBase("/search-index.json"));
       globalIndex = await response.json();
     }
     return globalIndex;
