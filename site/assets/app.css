@@ -56,7 +56,8 @@ a {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -543,6 +544,86 @@ input {
   color: var(--muted);
 }
 
+.reader-audio {
+  max-width: 780px;
+  margin-top: 24px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--paper) 90%, transparent);
+  box-shadow: 0 10px 30px rgba(31, 41, 51, 0.07);
+}
+
+.reader-audio-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.speech-button,
+.speech-rate,
+.speech-voice {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-strong);
+}
+
+.speech-button {
+  padding: 7px 12px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.speech-button-primary,
+.speech-button.is-active {
+  border-color: transparent;
+  color: #fff;
+  background: var(--accent);
+}
+
+.speech-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.speech-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.speech-rate {
+  padding-left: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+}
+
+.speech-rate select {
+  height: 36px;
+  padding: 0 28px 0 5px;
+  border: 0;
+  outline: 0;
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+}
+
+.speech-voice {
+  padding: 7px 11px;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.reader-audio-status {
+  margin: 7px 2px 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .reader-layout {
   max-width: 1240px;
   margin: 0 auto 80px;
@@ -591,6 +672,12 @@ input {
 
 .article-content p {
   margin: 0 0 18px;
+}
+
+.article-content .is-speaking {
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 13%, transparent);
 }
 
 .article-content blockquote {
@@ -703,6 +790,18 @@ input {
 
   .shelf-stage::after {
     display: none;
+  }
+
+  .reader-audio {
+    padding: 11px;
+  }
+
+  .reader-audio-controls {
+    align-items: stretch;
+  }
+
+  .speech-button-primary {
+    flex: 1 1 auto;
   }
 
   .book-grid {

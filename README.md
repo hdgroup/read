@@ -14,6 +14,7 @@
 - 新增 `scripts/build-site.mjs`，用 Node.js 直接把 Markdown 书稿生成静态 HTML，不再依赖 Jekyll、Ruby、接口服务或数据库。
 - 新增书籍列表页，以“五层书架”的形式展示书稿；每页 20 本书，每层 4 本，支持分页、封面和悬停简介。
 - 新增阅读页，右侧展示目录；默认显示章节目录，滚动到某一章时自动展开该章的二级目录，并同步阅读进度。
+- 每本书的正文页都提供朗读控制，优先使用浏览器提供的 Microsoft Xiaoxiao（晓晓）中文音色，默认以 2 倍速朗读。
 - 为每本书补齐封面素材：优先使用豆瓣封面，找不到时使用 AI 生成插图。封面统一放在 `site/assets/covers/`。
 - 新增 GitHub Pages 部署 workflow，推送到 `main` 后自动构建并发布到自定义域名 `read.delia.love`。
 

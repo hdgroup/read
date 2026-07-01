@@ -562,9 +562,32 @@ ${siteHeader()}
     <span>${post.wordCount.toLocaleString("zh-CN")} 字</span>
     <span>约 ${Math.max(1, Math.round(post.wordCount / 500))} 分钟</span>
   </div>
+  <section class="reader-audio" data-speech-reader aria-label="正文朗读">
+    <div class="reader-audio-controls">
+      <button class="speech-button speech-button-primary" data-speech-toggle type="button" aria-pressed="false">
+        <span aria-hidden="true" data-speech-icon>▶</span>
+        <span data-speech-label>朗读正文</span>
+      </button>
+      <button class="speech-button" data-speech-stop type="button" disabled>
+        <span aria-hidden="true">■</span>
+        <span>停止</span>
+      </button>
+      <label class="speech-rate">
+        <span>速度</span>
+        <select data-speech-rate aria-label="朗读速度">
+          <option value="1">1×</option>
+          <option value="1.5">1.5×</option>
+          <option value="2" selected>2×</option>
+          <option value="2.5">2.5×</option>
+        </select>
+      </label>
+      <span class="speech-voice" data-speech-voice title="优先使用 Microsoft Xiaoxiao（晓晓）中文音色">微软晓晓</span>
+    </div>
+    <p class="reader-audio-status" data-speech-status aria-live="polite">准备以 2 倍速朗读</p>
+  </section>
 </header>
 <main class="reader-layout">
-  <article class="article-content">
+  <article class="article-content" lang="zh-CN">
     ${post.html}
   </article>
   <aside class="toc-shell">
