@@ -66,31 +66,25 @@ function initSpeechReader() {
   const icon = $("[data-speech-icon]", root);
   const voiceBadge = $("[data-speech-voice]", root);
   const status = $("[data-speech-status]", root);
-  const synth = window.speechSynthesis;
-
-  if (!synth || typeof window.SpeechSynthesisUtterance === "undefined") {
-    toggle.disabled = true;
-    rateSelect.disabled = true;
-    voiceBadge.textContent = "浏览器不支持";
-    status.textContent = "当前浏览器不支持正文朗读";
-    return;
-  }
+  const audio = new Audio();
+  audio.preload = "auto";
+  voiceBadge.textContent = "微软晓晓";
+  voiceBadge.title = "当前音色：zh-CN-XiaoxiaoNeural";
 
   const blocks = $$("h1, h2, h3, h4, p, li, blockquote", article)
     .filter((element) => element.textContent.trim());
   const units = blocks.flatMap((element) => splitSpeechText(element.textContent)
     .map((text) => ({ text, element })));
 
-  let voices = [];
-  let selectedVoice = null;
   let currentIndex = 0;
   let activeElement = null;
-  let currentUtterance = null;
-  let isSpeaking = false;
+  let isReading = false;
   let isPaused = false;
+  let isLoading = false;
   let runId = 0;
+  let prefetchController = null;
 
-  function splitSpeechText(value, maxLength = 220) {
+  function splitSpeechText(value, maxLength = 420) {
     const text = value.replace(/\s+/g, " ").trim();
     if (text.length <= maxLength) return text ? [text] : [];
 
@@ -116,36 +110,6 @@ function initSpeechReader() {
     return chunks;
   }
 
-  function voiceScore(voice) {
-    const name = voice.name.toLowerCase();
-    const lang = voice.lang.toLowerCase();
-    if (name.includes("xiaoxiao") || name.includes("晓晓")) return 100;
-    if (name.includes("microsoft") && lang.startsWith("zh-cn")) return 80;
-    if (lang.startsWith("zh-cn")) return 60;
-    if (lang.startsWith("zh")) return 40;
-    return 0;
-  }
-
-  function refreshVoices() {
-    voices = synth.getVoices();
-    selectedVoice = [...voices]
-      .filter((voice) => voiceScore(voice) > 0)
-      .sort((a, b) => voiceScore(b) - voiceScore(a))[0] || null;
-
-    if (!selectedVoice) {
-      if (voices.length) {
-        voiceBadge.textContent = "系统默认";
-        voiceBadge.title = "当前浏览器未提供微软晓晓或其他中文音色";
-      }
-      return;
-    }
-    const isXiaoxiao = /xiaoxiao|晓晓/i.test(selectedVoice.name);
-    voiceBadge.textContent = isXiaoxiao ? "微软晓晓" : "中文语音";
-    voiceBadge.title = isXiaoxiao
-      ? `当前音色：${selectedVoice.name}`
-      : `未找到微软晓晓，当前使用：${selectedVoice.name}`;
-  }
-
   function setActiveElement(element) {
     if (activeElement === element) return;
     activeElement?.classList.remove("is-speaking");
@@ -160,56 +124,78 @@ function initSpeechReader() {
   }
 
   function updateControls(message) {
-    toggle.setAttribute("aria-pressed", String(isSpeaking && !isPaused));
-    toggle.classList.toggle("is-active", isSpeaking);
-    stop.disabled = !isSpeaking;
-    icon.textContent = isSpeaking && !isPaused ? "Ⅱ" : "▶";
-    label.textContent = !isSpeaking ? "朗读正文" : isPaused ? "继续朗读" : "暂停";
+    toggle.setAttribute("aria-pressed", String(isReading && !isPaused));
+    toggle.classList.toggle("is-active", isReading);
+    stop.disabled = !isReading;
+    icon.textContent = isReading && !isPaused ? "Ⅱ" : "▶";
+    label.textContent = !isReading ? "朗读正文" : isPaused ? "继续朗读" : "暂停";
     status.textContent = message;
   }
 
+  function clearAudio() {
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+  }
+
   function finish(message = "朗读完成") {
-    isSpeaking = false;
+    isReading = false;
     isPaused = false;
+    isLoading = false;
     currentIndex = 0;
-    currentUtterance = null;
+    prefetchController?.abort();
+    prefetchController = null;
+    clearAudio();
     setActiveElement(null);
     updateControls(message);
   }
 
-  function speakCurrent(id) {
-    if (id !== runId || !isSpeaking) return;
+  function unitAudioUrl(index) {
+    return withBase(`/api/tts?text=${encodeURIComponent(units[index].text)}`);
+  }
+
+  function prefetchNext(id) {
+    if (currentIndex + 1 >= units.length) return;
+    prefetchController?.abort();
+    prefetchController = new AbortController();
+    fetch(unitAudioUrl(currentIndex + 1), {
+      cache: "force-cache",
+      signal: prefetchController.signal
+    }).then((response) => {
+      if (!response.ok) throw new Error("TTS prefetch failed");
+      return response.arrayBuffer();
+    }).catch(() => {});
+  }
+
+  function playCurrent(id) {
+    if (id !== runId || !isReading) return;
     if (currentIndex >= units.length) {
       finish();
       return;
     }
 
-    const unit = units[currentIndex];
-    const utterance = new SpeechSynthesisUtterance(unit.text);
-    currentUtterance = utterance;
-    utterance.lang = "zh-CN";
-    utterance.rate = Number(rateSelect.value) || 2;
-    if (selectedVoice) utterance.voice = selectedVoice;
+    isLoading = true;
+    updateControls(`正在加载晓晓语音 · ${rateSelect.value} 倍速`);
+    audio.src = unitAudioUrl(currentIndex);
+    audio.playbackRate = Number(rateSelect.value) || 2;
 
-    utterance.onstart = () => {
-      if (id !== runId) return;
-      setActiveElement(unit.element);
+    audio.play().then(() => {
+      if (id !== runId || !isReading) {
+        audio.pause();
+        return;
+      }
+      isLoading = false;
+      setActiveElement(units[currentIndex].element);
       const progress = Math.min(100, Math.round(((currentIndex + 1) / units.length) * 100));
       updateControls(`正在朗读 · ${progress}% · ${rateSelect.value} 倍速`);
-    };
-    utterance.onend = () => {
-      if (id !== runId || !isSpeaking) return;
-      currentUtterance = null;
-      currentIndex += 1;
-      speakCurrent(id);
-    };
-    utterance.onerror = (event) => {
-      if (id !== runId || event.error === "canceled" || event.error === "interrupted") return;
-      currentUtterance = null;
-      finish("朗读暂时中断，请重试");
-    };
-
-    synth.speak(utterance);
+      prefetchNext(id);
+    }).catch((error) => {
+      if (id !== runId || error.name === "AbortError") return;
+      const message = error.name === "NotAllowedError"
+        ? "浏览器阻止了音频播放，请重新点击朗读"
+        : "晓晓朗读服务不可用，请确认 TTS 服务已启动";
+      finish(message);
+    });
   }
 
   function start() {
@@ -217,47 +203,64 @@ function initSpeechReader() {
       status.textContent = "这页没有可朗读的正文";
       return;
     }
-    refreshVoices();
-    isSpeaking = true;
+    isReading = true;
     isPaused = false;
     runId += 1;
     updateControls(`正在启动 · ${rateSelect.value} 倍速`);
-    speakCurrent(runId);
+    playCurrent(runId);
   }
 
   function pause() {
-    synth.pause();
+    audio.pause();
     isPaused = true;
     updateControls(`已暂停 · ${rateSelect.value} 倍速`);
   }
 
-  function resume() {
-    synth.resume();
+  async function resume() {
     isPaused = false;
-    updateControls(`继续朗读 · ${rateSelect.value} 倍速`);
+    if (isLoading) {
+      updateControls(`正在加载晓晓语音 · ${rateSelect.value} 倍速`);
+      return;
+    }
+    if (!audio.getAttribute("src")) {
+      playCurrent(runId);
+      return;
+    }
+    audio.playbackRate = Number(rateSelect.value) || 2;
+    try {
+      await audio.play();
+      updateControls(`继续朗读 · ${rateSelect.value} 倍速`);
+    } catch {
+      finish("浏览器阻止了音频播放，请重新点击朗读");
+    }
   }
 
   function stopReading() {
     runId += 1;
-    synth.cancel();
     finish(`已停止 · 准备以 ${rateSelect.value} 倍速朗读`);
   }
 
+  audio.addEventListener("ended", () => {
+    if (!isReading) return;
+    currentIndex += 1;
+    playCurrent(runId);
+  });
+  audio.addEventListener("error", () => {
+    if (isReading && !isLoading) finish("音频播放失败，请重试");
+  });
   toggle.addEventListener("click", () => {
-    if (!isSpeaking) start();
+    if (!isReading) start();
     else if (isPaused) resume();
     else pause();
   });
   stop.addEventListener("click", stopReading);
   rateSelect.addEventListener("change", () => {
-    status.textContent = isSpeaking
-      ? `速度已设为 ${rateSelect.value} 倍，将从下一段生效`
+    audio.playbackRate = Number(rateSelect.value) || 2;
+    status.textContent = isReading
+      ? `速度已设为 ${rateSelect.value} 倍`
       : `准备以 ${rateSelect.value} 倍速朗读`;
   });
-  window.addEventListener("beforeunload", () => synth.cancel());
-  synth.addEventListener?.("voiceschanged", refreshVoices);
-
-  refreshVoices();
+  window.addEventListener("beforeunload", stopReading);
 }
 
 initTheme();

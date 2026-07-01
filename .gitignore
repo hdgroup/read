@@ -1,4 +1,6 @@
 .DS_Store
+.venv/
+__pycache__/
 dist/
 _site/
 site/assets/covers/douban-cover-results.json

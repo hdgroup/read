@@ -581,7 +581,7 @@ ${siteHeader()}
           <option value="2.5">2.5×</option>
         </select>
       </label>
-      <span class="speech-voice" data-speech-voice title="优先使用 Microsoft Xiaoxiao（晓晓）中文音色">微软晓晓</span>
+      <span class="speech-voice" data-speech-voice title="当前音色：zh-CN-XiaoxiaoNeural">微软晓晓</span>
     </div>
     <p class="reader-audio-status" data-speech-status aria-live="polite">准备以 2 倍速朗读</p>
   </section>
